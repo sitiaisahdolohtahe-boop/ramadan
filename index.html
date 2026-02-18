@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ramadan 2026</title>
+
+<style>
+body{
+  margin:0;
+  font-family: Arial, Helvetica, sans-serif;
+  background: linear-gradient(to bottom, #0f2027, #203a43, #2c5364);
+  color:white;
+  overflow:hidden;
+}
+
+/* ===== Background ===== */
+.stars{
+  position:absolute;
+  width:100%;
+  height:100%;
+  background:
+    radial-gradient(2px 2px at 20% 30%, white, transparent),
+    radial-gradient(2px 2px at 70% 20%, white, transparent),
+    radial-gradient(2px 2px at 50% 60%, white, transparent),
+    radial-gradient(2px 2px at 80% 70%, white, transparent);
+  animation:twinkle 4s infinite alternate;
+}
+
+@keyframes twinkle{
+  from{ opacity:0.4; }
+  to{ opacity:1; }
+}
+
+.moon{
+  position:absolute;
+  top:80px;
+  left:-120px;
+  width:100px;
+  height:100px;
+  background:radial-gradient(circle at 30% 30%, #fff, #ddd);
+  border-radius:50%;
+  box-shadow:0 0 40px rgba(255,255,255,0.6);
+  animation:moonMove 60s linear infinite;
+}
+
+@keyframes moonMove{
+  from{ left:-120px; }
+  to{ left:110%; }
+}
+
+.mosque{
+  position:fixed;
+  bottom:0;
+  width:100%;
+  height:180px;
+  background:black;
+  clip-path: polygon(
+    0% 100%, 0% 60%, 10% 60%, 15% 40%, 20% 60%, 
+    40% 60%, 50% 30%, 60% 60%, 80% 60%, 
+    85% 40%, 90% 60%, 100% 60%, 100% 100%
+  );
+}
+
+/* ===== Panel ===== */
+.info-panel{
+  position:fixed;
+  bottom:200px;
+  width:100%;
+  padding:0 40px;
+  z-index:5;
+}
+
+.location{
+  font-size:16px;
+  opacity:0.8;
+  margin-bottom:8px;
+}
+
+.main-time{
+  font-size:48px;
+  font-weight:bold;
+  margin-bottom:30px;
+  text-shadow:0 0 20px rgba(255,255,255,0.4);
+}
+
+.center-dates{
+  text-align:center;
+  font-size:18px;
+  line-height:1.6;
+  margin-bottom:30px;
+  opacity:0.9;
+}
+
+.prayer-row{
+  display:flex;
+  justify-content:space-between;
+  font-size:18px;
+  margin-bottom:25px;
+}
+
+/* ===== Glow Styles ===== */
+.active-iftar{
+  color:#ffd700;
+  text-shadow:0 0 15px #ffd700;
+  font-weight:bold;
+}
+
+.active-suhoor{
+  color:#6ecbff;
+  text-shadow:0 0 15px #6ecbff;
+  font-weight:bold;
+}
+
+.countdown{
+  text-align:center;
+  font-size:30px;
+  font-weight:600;
+  letter-spacing:2px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="stars"></div>
+<div class="moon"></div>
+
+<div class="info-panel">
+
+  <div class="location">Bangkok, Thailand</div>
+
+  <div class="main-time" id="clock">--:--:--</div>
+
+  <div class="center-dates">
+    <div id="gregorian-date"></div>
+    <div id="hijri-date"></div>
+  </div>
+
+  <div class="prayer-row">
+    <div>Iftar: <span id="iftar-time">--:--</span></div>
+    <div>Suhoor: <span id="suhoor-time">--:--</span></div>
+  </div>
+
+  <div class="countdown" id="countdown">--:--:--</div>
+
+</div>
+
+<div class="mosque"></div>
+
+<script>
+const city = "Bangkok";
+const country = "Thailand";
+
+let maghribTime = null;
+let fajrTime = null;
+
+async function getPrayerTimes(){
+  const response = await fetch(
+    `https://api.aladhan.com/v1/timingsByCity?city=${city}&country=${country}&method=2`
+  );
+  const data = await response.json();
+
+  maghribTime = data.data.timings.Maghrib;
+  fajrTime = data.data.timings.Fajr;
+
+  document.getElementById("iftar-time").innerText = maghribTime;
+  document.getElementById("suhoor-time").innerText = fajrTime;
+}
+
+function updateClock(){
+  const now = new Date();
+
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+
+  document.getElementById("clock").innerText = `${h}:${m}:${s}`;
+
+  document.getElementById("gregorian-date").innerText =
+    now.toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+
+  document.getElementById("hijri-date").innerText =
+    new Intl.DateTimeFormat('en-TN-u-ca-islamic',{
+      day:'numeric',month:'long',year:'numeric'
+    }).format(now);
+
+  updateCountdown();
+}
+
+function updateCountdown(){
+  if(!maghribTime || !fajrTime) return;
+
+  const now = new Date();
+
+  const [magH, magM] = maghribTime.split(":");
+  const [fajrH, fajrM] = fajrTime.split(":");
+
+  let maghrib = new Date();
+  maghrib.setHours(magH, magM, 0);
+
+  let fajr = new Date();
+  fajr.setHours(fajrH, fajrM, 0);
+
+  let target;
+
+  const iftarEl = document.getElementById("iftar-time");
+  const suhoorEl = document.getElementById("suhoor-time");
+
+  iftarEl.classList.remove("active-iftar");
+  suhoorEl.classList.remove("active-suhoor");
+
+  if(now < maghrib){
+    target = maghrib;
+    iftarEl.classList.add("active-iftar");
+  } else {
+    if(now > fajr){
+      fajr.setDate(fajr.getDate() + 1);
+    }
+    target = fajr;
+    suhoorEl.classList.add("active-suhoor");
+  }
+
+  const diff = target - now;
+
+  const hrs = String(Math.floor(diff/3600000)).padStart(2,'0');
+  const mins = String(Math.floor((diff%3600000)/60000)).padStart(2,'0');
+  const secs = String(Math.floor((diff%60000)/1000)).padStart(2,'0');
+
+  document.getElementById("countdown").innerText =
+    `${hrs}:${mins}:${secs}`;
+}
+
+setInterval(updateClock,1000);
+updateClock();
+getPrayerTimes();
+</script>
+
+</body>
+</html>
