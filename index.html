@@ -9,7 +9,6 @@ body{
     background:#05060d;
     color:white;
     font-family:sans-serif;
-    overflow:hidden;
 }
 .container{
     position:absolute;
@@ -51,29 +50,19 @@ let maghribTime=null;
 let fajrTime=null;
 let currentMode="iftar";
 
-/* ===== ดึงเวลาจากพิกัดจริง ===== */
+/* ===== ใช้ timingsByCity (ไม่โดน CORS) ===== */
 async function fetchTimesByCity(city){
     try{
-        // แปลงชื่อเมือง → พิกัด
-        let geo = await fetch(
-            `https://api.aladhan.com/v1/geocode?address=${city},Thailand`
-        );
-        let geoData = await geo.json();
-
-        if(!geoData.data || geoData.data.length === 0){
-            alert("City not found ❌");
-            return;
-        }
-
-        let lat = geoData.data[0].latitude;
-        let lon = geoData.data[0].longitude;
-
-        // ดึงเวลาละหมาด
         let response = await fetch(
-`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=3&school=0`
+`https://api.aladhan.com/v1/timingsByCity?city=${city}&country=Thailand&method=3&school=0`
         );
 
         let data = await response.json();
+
+        if(data.code !== 200){
+            alert("City not found ❌");
+            return;
+        }
 
         maghribTime = data.data.timings.Maghrib.split(" ")[0];
         fajrTime    = data.data.timings.Fajr.split(" ")[0];
@@ -106,7 +95,7 @@ document.getElementById("cityInput")
     if(e.key==="Enter") searchCity();
 });
 
-/* ===== Countdown Logic ===== */
+/* ===== Countdown ===== */
 function getTarget(){
     let now=new Date();
     let target=new Date();
@@ -114,7 +103,6 @@ function getTarget(){
     if(currentMode==="iftar"){
         let [h,m]=maghribTime.split(":");
         target.setHours(h,m,0);
-
         if(now>=target){
             currentMode="suhoor";
             return getTarget();
@@ -122,7 +110,6 @@ function getTarget(){
     }else{
         let [h,m]=fajrTime.split(":");
         target.setHours(h,m,0);
-
         if(now>=target){
             currentMode="iftar";
             return getTarget();
