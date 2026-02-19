@@ -1,191 +1,112 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ramadan Night</title>
-
+<title>Ramadan Thailand</title>
 <style>
 body{
     margin:0;
     background:#05060d;
-    font-family:'Segoe UI',sans-serif;
     color:white;
+    font-family:sans-serif;
     overflow:hidden;
 }
-
-canvas{
-    position:absolute;
-    top:0;
-    left:0;
-}
-
-/* ===== Layout ===== */
-
 .container{
     position:absolute;
     top:30px;
     left:40px;
-    right:40px;
 }
-
-.row{
-    display:flex;
-    justify-content:space-between;
-    margin-bottom:8px;
-    font-size:16px;
-}
-
-#location{
-    font-size:18px;
-    margin-bottom:12px;
-}
-
-#clock{
-    font-size:26px;
-    margin-bottom:6px;
-}
-
 #countdown{
     position:absolute;
+    bottom:120px;
     width:100%;
     text-align:center;
-    bottom:120px;
-    font-size:52px;
-    letter-spacing:3px;
-    text-shadow:0 0 20px rgba(255,255,255,0.3);
+    font-size:50px;
 }
-
-input, button{
+input,button{
     padding:6px 10px;
-    margin-right:5px;
     border:none;
     border-radius:5px;
 }
-button{
-    cursor:pointer;
-}
+button{cursor:pointer;}
 </style>
 </head>
-
 <body>
 
-<canvas id="canvas"></canvas>
-
 <div class="container">
+    <div id="location">Loading...</div><br>
 
-    <div id="location">Enter your city</div>
-
-    <input type="text" id="cityInput" placeholder="Enter city name">
+    <input type="text" id="cityInput" placeholder="Enter city (Thailand)">
     <button onclick="searchCity()">Search</button>
 
-    <div id="clock"></div>
-
-    <div class="row">
-        <div id="date"></div>
-        <div id="hijri"></div>
-    </div>
-
-    <div class="row">
-        <div id="iftar"></div>
-        <div id="suhoor"></div>
-    </div>
-
+    <div id="iftar"></div>
+    <div id="suhoor"></div>
 </div>
 
 <div id="countdown"></div>
 
 <script>
-const canvas=document.getElementById("canvas");
-const ctx=canvas.getContext("2d");
-
-/* ===== Background Stars ===== */
-function resizeCanvas(){
-    canvas.width=window.innerWidth;
-    canvas.height=window.innerHeight;
-}
-resizeCanvas();
-window.addEventListener("resize",resizeCanvas);
-
-let stars=[];
-for(let i=0;i<120;i++){
-    stars.push({
-        x:Math.random()*canvas.width,
-        y:Math.random()*canvas.height,
-        r:Math.random()*2,
-        o:Math.random()*1000
-    });
-}
-
-function drawStars(){
-    stars.forEach(s=>{
-        ctx.beginPath();
-        ctx.arc(s.x,s.y,s.r,0,Math.PI*2);
-        ctx.fillStyle="rgba(255,255,255,"+
-            (0.3+Math.sin(Date.now()/500+s.o)*0.5)+")";
-        ctx.fill();
-    });
-}
-
-function animate(){
-    ctx.clearRect(0,0,canvas.width,canvas.height);
-    drawStars();
-    requestAnimationFrame(animate);
-}
-animate();
-
-/* ===== Time & API ===== */
 
 let maghribTime=null;
 let fajrTime=null;
 let currentMode="iftar";
 
+/* ===== ดึงเวลาจากพิกัดจริง ===== */
 async function fetchTimesByCity(city){
-    let response = await fetch(
-        `https://api.aladhan.com/v1/timingsByCity?city=${city}&country=Thailand&method=2`
-    );
+    try{
+        // แปลงชื่อเมือง → พิกัด
+        let geo = await fetch(
+            `https://api.aladhan.com/v1/geocode?address=${city},Thailand`
+        );
+        let geoData = await geo.json();
 
-    let data = await response.json();
+        if(!geoData.data || geoData.data.length === 0){
+            alert("City not found ❌");
+            return;
+        }
 
-    maghribTime = data.data.timings.Maghrib;
-    fajrTime = data.data.timings.Fajr;
+        let lat = geoData.data[0].latitude;
+        let lon = geoData.data[0].longitude;
 
-    document.getElementById("iftar").innerText = "Iftar: " + maghribTime;
-    document.getElementById("suhoor").innerText = "Suhoor: " + fajrTime;
-    document.getElementById("location").innerText = city + ", Thailand";
-}
+        // ดึงเวลาละหมาด
+        let response = await fetch(
+`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=3&school=0`
+        );
 
-function searchCity(){
-    let city = document.getElementById("cityInput").value;
-    if(city){
-        fetchTimesByCity(city);
+        let data = await response.json();
+
+        maghribTime = data.data.timings.Maghrib.split(" ")[0];
+        fajrTime    = data.data.timings.Fajr.split(" ")[0];
+
+        document.getElementById("iftar").innerText =
+            "Iftar (Maghrib): " + maghribTime;
+
+        document.getElementById("suhoor").innerText =
+            "Subuh (Fajr): " + fajrTime;
+
+        document.getElementById("location").innerText =
+            city + ", Thailand";
+
+    }catch(error){
+        alert("Error fetching data");
     }
 }
 
-/* ===== Clock & Date ===== */
-
-const ramadanStart=new Date("2026-02-19");
-
-function updateDateTime(){
-    let now=new Date();
-
-    document.getElementById("clock").innerText=
-        now.toLocaleTimeString("en-GB");
-
-    document.getElementById("date").innerText=
-        now.toLocaleDateString("en-GB",{
-            day:'numeric',
-            month:'long',
-            year:'numeric'
-        });
-
-    let diff=Math.floor((now-ramadanStart)/(1000*60*60*24))+1;
-    document.getElementById("hijri").innerText=
-        diff+" Ramadan 1447";
+/* ===== Search ===== */
+function searchCity(){
+    let city=document.getElementById("cityInput").value.trim();
+    if(city){
+        fetchTimesByCity(city);
+        document.getElementById("cityInput").value="";
+    }
 }
 
-/* ===== Countdown ===== */
+document.getElementById("cityInput")
+.addEventListener("keydown",function(e){
+    if(e.key==="Enter") searchCity();
+});
 
+/* ===== Countdown Logic ===== */
 function getTarget(){
     let now=new Date();
     let target=new Date();
@@ -229,10 +150,12 @@ function updateCountdown(){
         s.toString().padStart(2,"0");
 }
 
-setInterval(updateDateTime,1000);
 setInterval(updateCountdown,1000);
-</script>
 
+/* ===== Default ===== */
+fetchTimesByCity("Hat Yai");
+
+</script>
 </body>
 </html>
 
