@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>Ramadan Thailand</title>
+<title>Ramadan GPS Thailand</title>
 <style>
 body{
     margin:0;
@@ -22,24 +22,21 @@ body{
     text-align:center;
     font-size:50px;
 }
-input,button{
+button{
     padding:6px 10px;
     border:none;
     border-radius:5px;
+    cursor:pointer;
 }
-button{cursor:pointer;}
 </style>
 </head>
 <body>
 
 <div class="container">
-    <div id="location">Loading...</div><br>
-
-    <input type="text" id="cityInput" placeholder="Enter city (Thailand)">
-    <button onclick="searchCity()">Search</button>
-
+    <div id="location">Detecting location...</div><br>
     <div id="iftar"></div>
-    <div id="suhoor"></div>
+    <div id="suhoor"></div><br>
+    <button onclick="getLocation()">Refresh GPS</button>
 </div>
 
 <div id="countdown"></div>
@@ -50,49 +47,61 @@ let maghribTime=null;
 let fajrTime=null;
 let currentMode="iftar";
 
-/* ===== ใช้ timingsByAddress (ไม่โดน CORS) ===== */
-async function fetchTimesByCity(city){
-    try{
-        let response = await fetch(
-`https://api.aladhan.com/v1/timingsByAddress?address=${city},Thailand&method=3&school=0`
+/* ===== ดึงเวลาละหมาดจากพิกัดจริง ===== */
+async function fetchPrayerTimes(lat,lon){
+    let response = await fetch(
+`https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=99&school=0&fajr=18&isha=17`
+    );
+
+    let data = await response.json();
+
+    maghribTime = data.data.timings.Maghrib.split(" ")[0];
+    fajrTime    = data.data.timings.Fajr.split(" ")[0];
+
+    document.getElementById("iftar").innerText =
+        "Iftar (Maghrib): " + maghribTime;
+
+    document.getElementById("suhoor").innerText =
+        "Subuh (Fajr): " + fajrTime;
+}
+
+/* ===== แปลงพิกัดเป็นชื่อจังหวัด ===== */
+async function reverseGeocode(lat,lon){
+    let response = await fetch(
+`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}`
+    );
+
+    let data = await response.json();
+
+    let province =
+        data.address.state ||
+        data.address.province ||
+        data.address.city ||
+        "Thailand";
+
+    document.getElementById("location").innerText =
+        province + ", Thailand";
+}
+
+/* ===== ขอ GPS ===== */
+function getLocation(){
+    if(navigator.geolocation){
+        navigator.geolocation.getCurrentPosition(
+            pos=>{
+                let lat = pos.coords.latitude;
+                let lon = pos.coords.longitude;
+
+                fetchPrayerTimes(lat,lon);
+                reverseGeocode(lat,lon);
+            },
+            error=>{
+                alert("Location access denied ❌");
+            }
         );
-
-        let data = await response.json();
-
-        if(data.code !== 200){
-            alert("City not found ❌");
-            return;
-        }
-
-        maghribTime = data.data.timings.Maghrib.split(" ")[0];
-        fajrTime    = data.data.timings.Fajr.split(" ")[0];
-
-        document.getElementById("iftar").innerText =
-            "Iftar (Maghrib): " + maghribTime;
-
-        document.getElementById("suhoor").innerText =
-            "Subuh (Fajr): " + fajrTime;
-
-        document.getElementById("location").innerText =
-            city + ", Thailand";
-
-    }catch(error){
-        alert("Error fetching data ❌");
+    }else{
+        alert("Geolocation not supported");
     }
 }
-
-function searchCity(){
-    let city=document.getElementById("cityInput").value.trim();
-    if(city){
-        fetchTimesByCity(city);
-        document.getElementById("cityInput").value="";
-    }
-}
-
-document.getElementById("cityInput")
-.addEventListener("keydown",function(e){
-    if(e.key==="Enter") searchCity();
-});
 
 /* ===== Countdown ===== */
 function getTarget(){
@@ -138,8 +147,8 @@ function updateCountdown(){
 
 setInterval(updateCountdown,1000);
 
-/* ===== Default ===== */
-fetchTimesByCity("Hat Yai");
+/* ===== เริ่มทันที ===== */
+getLocation();
 
 </script>
 </body>
