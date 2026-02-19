@@ -55,6 +55,16 @@ canvas{
     letter-spacing:3px;
     text-shadow:0 0 20px rgba(255,255,255,0.3);
 }
+
+input, button{
+    padding:6px 10px;
+    margin-right:5px;
+    border:none;
+    border-radius:5px;
+}
+button{
+    cursor:pointer;
+}
 </style>
 </head>
 
@@ -64,7 +74,10 @@ canvas{
 
 <div class="container">
 
-    <div id="location">Loading location...</div>
+    <div id="location">Enter your city</div>
+
+    <input type="text" id="cityInput" placeholder="Enter city name">
+    <button onclick="searchCity()">Search</button>
 
     <div id="clock"></div>
 
@@ -127,33 +140,25 @@ let maghribTime=null;
 let fajrTime=null;
 let currentMode="iftar";
 
-async function fetchTimes(lat,lon){
-    let response=await fetch(
-        `https://api.aladhan.com/v1/timings?latitude=${lat}&longitude=${lon}&method=2`
+async function fetchTimesByCity(city){
+    let response = await fetch(
+        `https://api.aladhan.com/v1/timingsByCity?city=${city}&country=Thailand&method=2`
     );
-    let data=await response.json();
 
-    maghribTime=data.data.timings.Maghrib;
-    fajrTime=data.data.timings.Fajr;
+    let data = await response.json();
 
-    document.getElementById("iftar").innerText="Iftar: "+maghribTime;
-    document.getElementById("suhoor").innerText="Suhoor: "+fajrTime;
+    maghribTime = data.data.timings.Maghrib;
+    fajrTime = data.data.timings.Fajr;
+
+    document.getElementById("iftar").innerText = "Iftar: " + maghribTime;
+    document.getElementById("suhoor").innerText = "Suhoor: " + fajrTime;
+    document.getElementById("location").innerText = city + ", Thailand";
 }
 
-function getLocation(){
-    if(navigator.geolocation){
-        navigator.geolocation.getCurrentPosition(
-            pos=>{
-                fetchTimes(pos.coords.latitude,pos.coords.longitude);
-                document.getElementById("location").innerText=
-                    "Bangkok, Thailand";
-            },
-            ()=>{
-                fetchTimes(13.7563,100.5018);
-                document.getElementById("location").innerText=
-                    "Bangkok, Thailand";
-            }
-        );
+function searchCity(){
+    let city = document.getElementById("cityInput").value;
+    if(city){
+        fetchTimesByCity(city);
     }
 }
 
@@ -224,7 +229,6 @@ function updateCountdown(){
         s.toString().padStart(2,"0");
 }
 
-getLocation();
 setInterval(updateDateTime,1000);
 setInterval(updateCountdown,1000);
 </script>
